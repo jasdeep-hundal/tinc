@@ -618,6 +618,8 @@ static void choose_local_address(const node_t *n, const sockaddr_t **sa, int *so
 	}
 }
 
+// ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
+// the optimization will likely happen here
 static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	vpn_packet_t pkt1, pkt2;
 	vpn_packet_t *pkt[] = { &pkt1, &pkt2, &pkt1, &pkt2 };
@@ -870,6 +872,9 @@ bool receive_sptps_record(void *handle, uint8_t type, const char *data, uint16_t
 	return true;
 }
 
+// ANNOT: where the user space talks to the kernel space; encryption happens here
+// Look into send_udppacket
+
 /*
   send a packet to the given vpn ip.
 */
@@ -1028,6 +1033,9 @@ void handle_incoming_vpn_data(void *data, int flags) {
 	receive_udppacket(n, &pkt);
 }
 
+// ANNOT: this is the key callback here.  Whenever the tinc character device gets some data, this
+// callback is invoked.  Note that the actual implementation of the read() function used here is
+// platform-dependent.  See linux/device.c and bsd/device.c for details.
 void handle_device_data(void *data, int flags) {
 	vpn_packet_t packet;
 
