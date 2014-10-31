@@ -80,6 +80,7 @@ typedef union sockaddr_t {
 #define SALEN(s) (s.sa_family==AF_INET?sizeof(struct sockaddr_in):sizeof(struct sockaddr_in6))
 #endif
 
+// ANNOT: packet definition
 typedef struct vpn_packet_t {
 	length_t len;           /* the actual number of bytes in the `data' field */
 	int priority;           /* priority or TOS */

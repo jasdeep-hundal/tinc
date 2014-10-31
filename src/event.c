@@ -268,6 +268,7 @@ bool event_loop(void) {
 			fds = last->fd + 1;
 		}
 
+        // ANNOT: select is inefficient.  Why not epoll?
 		int n = select(fds, &readable, &writable, NULL, tv);
 
 		if(n < 0) {
@@ -280,6 +281,7 @@ bool event_loop(void) {
 		if(!n)
 			continue;
 
+        // ANNOT: splay tree?  maybe there is something to do with the data structures
 		for splay_each(io_t, io, &io_tree) {
 			if(FD_ISSET(io->fd, &writable))
 				io->cb(io->data, IO_WRITE);

@@ -936,6 +936,8 @@ static bool setup_myself(void) {
 	if(!devops.setup())
 		return false;
 
+    // ANNOT: here, a callback is registered such that whenever the tinc character device
+    // gets some data, this callback will be called
 	if(device_fd >= 0)
 		io_add(&device_io, handle_device_data, NULL, device_fd, IO_READ);
 
@@ -1034,6 +1036,7 @@ static bool setup_myself(void) {
 
 /*
   initialize network
+  ANNOT: the bulk of bootstrap logic
 */
 bool setup_network(void) {
 	init_connections();

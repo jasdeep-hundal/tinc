@@ -870,6 +870,9 @@ bool receive_sptps_record(void *handle, uint8_t type, const char *data, uint16_t
 	return true;
 }
 
+// ANNOT: where the user space talks to the kernel space; encryption happens here
+// Look into send_udppacket
+
 /*
   send a packet to the given vpn ip.
 */
@@ -1028,6 +1031,9 @@ void handle_incoming_vpn_data(void *data, int flags) {
 	receive_udppacket(n, &pkt);
 }
 
+// ANNOT: this is the key callback here.  Whenever the tinc character device gets some data, this
+// callback is invoked.  Note that the actual implementation of the read() function used here is
+// platform-dependent.  See linux/device.c and bsd/device.c for details.
 void handle_device_data(void *data, int flags) {
 	vpn_packet_t packet;
 
