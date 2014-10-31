@@ -108,7 +108,20 @@ You can also use the following to start tinc in the foreground for debugging:
 
     sudo tincd -n YOUR_NETWORK_NAME -D -d3
 
+REQUIREMENTS FOR TEST SCRIPTS
+=============================
+Install netperf and run netserver as a daemon (helpful to do on both VMs):
+
+    sudo yum install netperf
+
+The users used for tinc testing on both hosts must have passwordless sudo access.
+
 TEST SCRIPTS
 ============
+Start tincd and then netserver on one VM and the run of the following scripts on
+the other VM.
+
 Compare network performance w/ and w/o tinc:
+
+    ./perfTest.sh
 
