@@ -28,6 +28,8 @@ TINCD_PERF_FILE="tinc_perf-$TIMESTAMP.dat"
 TINCD_STRACE_FILE="tinc_strace-$TIMESTAMP.txt"
 NETPERF_PERF_FILE="netperf_perf-$TIMESTAMP.dat"
 NETPERF_TINC_PERF_FILE="netperf_through_tinc_perf-$TIMESTAMP.dat"
+SYSTEM_PERF_FILE="sys_perf-$TIMESTAMP.dat"
+SYSTEM_PERF_W_TINC_FILE="sys_perf_w_tinc-$TIMESTAMP.dat"
 PWD=`pwd`
 HOST_IFACE_LOG="$PWD/host_bandwidth-$TIMESTAMP.txt"
 TINC_IFACE_LOG="$PWD/tinc_bandwidth-$TIMESTAMP.txt"
@@ -43,16 +45,22 @@ remote_host_command "nohup netserver" > /dev/null
 echo "Testing bulk data performance w/o tinc VPN"
 LOCAL_HOST_INTERFACE=`sudo ifconfig | grep -B 1 $LOCAL_HOST_IP | head -n 1 | cut -d ' ' -f 1`
 sudo ifstat -i $LOCAL_HOST_INTERFACE -n 0.1 > $HOST_IFACE_LOG &
-sudo perf record  -g -o $NETPERF_PERF_FILE -- netperf -H $REMOTE_HOST_IP
+sudo perf record -a -g -o $SYSTEM_PERF_FILE &
+#sudo perf record  -g -o $NETPERF_PERF_FILE -- netperf -H $REMOTE_HOST_IP
+#sudo perf stat -a netperf -H $REMOTE_HOST_IP
+netperf -H $REMOTE_HOST_IP
 sudo pkill -3 perf
 sudo pkill -3 ifstat
 
 echo "Testing bulk data performance w/ tinc VPN"
-sudo perf record  -g -o $TINCD_PERF_FILE -p $LOCAL_TINCD_PID &
-sudo strace -c -p $LOCAL_TINCD_PID -o $TINCD_STRACE_FILE &
+#sudo perf record  -g -o $TINCD_PERF_FILE -p $LOCAL_TINCD_PID &
+#sudo strace -c -p $LOCAL_TINCD_PID -o $TINCD_STRACE_FILE &
 LOCAL_TINC_INTERFACE=`sudo ifconfig | grep -B 1 $LOCAL_HOST_TINC_IP | head -n 1 | cut -d ' ' -f 1`
 sudo ifstat -i $LOCAL_TINC_INTERFACE -n 0.1 > $TINC_IFACE_LOG &
-sudo perf record -g -o $NETPERF_TINC_PERF_FILE -- netperf -H $REMOTE_HOST_TINC_IP
+sudo perf record -a -g -o $SYSTEM_PERF_W_TINC_FILE &
+#sudo perf record -g -o $NETPERF_TINC_PERF_FILE -- netperf -H $REMOTE_HOST_TINC_IP
+#sudo perf stat -a netperf -H $REMOTE_HOST_TINC_IP
+netperf -H $REMOTE_HOST_TINC_IP
 sudo pkill -3 perf
 sudo pkill -3 ifstat
 sudo pkill -3 strace
