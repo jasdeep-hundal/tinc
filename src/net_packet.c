@@ -736,6 +736,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
+    logger(DEBUG_ALWAYS, LOG_DEBUG, "Sending via socket!!");
 	if(sendto(listen_socket[sock].udp.fd, (char *) &inpkt->seqno, inpkt->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
 		if(sockmsgsize(sockerrno)) {
 			if(n->maxmtu >= origlen)
@@ -914,11 +915,9 @@ void send_packet(node_t *n, vpn_packet_t *packet) {
 			   n->name, via->name, n->via->hostname);
 
 	if(packet->priority == -1 || ((myself->options | via->options) & OPTION_TCPONLY)) {
-		logger(DEBUG_ALWAYS, LOG_INFO, "sending a tcp packet");
 		if(!send_tcppacket(via->connection, packet))
 			terminate_connection(via->connection, true);
     } else {
-		logger(DEBUG_ALWAYS, LOG_INFO, "sending a udp packet");
 		send_udppacket(via, packet);
     }
 }
