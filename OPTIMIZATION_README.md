@@ -2,9 +2,12 @@ INSTALLATION
 ============
 Installation steps (performed in the base directory of the tinc source):
 
-    autoconf -f
-    ./configure
+    autoreconf -i
+    ./configure --sysconfdir=/etc --localstatedir=/var
     sudo make install
+
+Make sure the following packages are installed:
+libncurses5-dev libreadline-dev zlibc liblzo2-dev libssl-dev autoconf libtool texinfo
 
 CONFIGURATION
 =============
