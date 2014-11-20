@@ -758,6 +758,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
             num_msg = 0;
         }
     } else {
+        logger(DEBUG_ALWAYS, LOG_INFO, "here yo yo yo!");
         msgbuf[num_msg].msg_hdr.msg_name = (void *) &sa->sa;
         msgbuf[num_msg].msg_hdr.msg_namelen = SALEN(sa->sa);
         msgbuf[num_msg].msg_hdr.msg_iovlen = 1;
@@ -782,6 +783,8 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
                 free(msgbuf[i].msg_hdr.msg_iov);
                 free(msgbuf[i].msg_hdr.msg_iov->iov_base);
             }
+            // Reset the counter
+            num_msg = 0;
         }
     }
 
