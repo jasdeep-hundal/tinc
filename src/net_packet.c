@@ -743,6 +743,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
     msgbuf[num_msg].msg_hdr.msg_name = (void *) &sa->sa;
     msgbuf[num_msg].msg_hdr.msg_namelen = SALEN(sa->sa);
     msgbuf[num_msg].msg_hdr.msg_iovlen = 1;
+    msgbuf[num_msg].msg_hdr.msg_iov = malloc(sizeof(struct iovec));
     msgbuf[num_msg].msg_hdr.msg_iov->iov_base = strndup((char *) &inpkt->seqno, inpkt->len);
     msgbuf[num_msg].msg_hdr.msg_iov->iov_len = inpkt->len;
     msgbuf[num_msg].msg_hdr.msg_control = NULL;
@@ -759,6 +760,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
         }
         // Free packets 
         for (int i = 0; i < MSGBUF_SZ; i++) {
+            free(msgbuf[i].msg_hdr.msg_iov);
             free(msgbuf[i].msg_hdr.msg_iov->iov_base);
         }
         // Reset the counter
