@@ -61,6 +61,7 @@ bool localdiscovery = true;
 #define MSGBUF_SZ 100
 static struct mmsghdr msgbuf[MSGBUF_SZ];
 static unsigned int num_msg = 0;
+static bool in_control_phase = true;
 
 /* mtuprobes == 1..30: initial discovery, send bursts with 1 second interval
    mtuprobes ==    31: sleep pinginterval seconds
@@ -741,8 +742,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 #endif
 
     // this is a temperary hack: we don't want to buffer the first several control packets
-    if (num_msg < 100) {
-        num_msg++;
+    if (in_control_phase) {
         if(sendto(listen_socket[sock].udp.fd, (char *) &inpkt->seqno, inpkt->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
             if(sockmsgsize(sockerrno)) {
                 if(n->maxmtu >= origlen)
@@ -751,6 +751,11 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
                     n->mtu = origlen - 1;
             } else
                 logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+        }
+        num_msg++;
+        if (num_msg > 100) {
+            in_control_phase = false;
+            num_msg = 0;
         }
     } else {
         msgbuf[num_msg].msg_hdr.msg_name = (void *) &sa->sa;
@@ -764,7 +769,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
         msgbuf[num_msg].msg_hdr.msg_flags = 0;
         num_msg++;
 
-        if (num_msg % MSGBUF_SZ == 0) {
+        if (num_msg == MSGBUF_SZ) {
             // Send all of them!
             logger(DEBUG_ALWAYS, LOG_INFO, "sending 100 udp messages!");
             if (sendmmsg(listen_socket[sock].udp.fd, msgbuf, MSGBUF_SZ, 0) < 0 &&
