@@ -740,32 +740,44 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-    msgbuf[num_msg].msg_hdr.msg_name = (void *) &sa->sa;
-    msgbuf[num_msg].msg_hdr.msg_namelen = SALEN(sa->sa);
-    msgbuf[num_msg].msg_hdr.msg_iovlen = 1;
-    msgbuf[num_msg].msg_hdr.msg_iov = malloc(sizeof(struct iovec));
-    msgbuf[num_msg].msg_hdr.msg_iov->iov_base = strndup((char *) &inpkt->seqno, inpkt->len);
-    msgbuf[num_msg].msg_hdr.msg_iov->iov_len = inpkt->len;
-    msgbuf[num_msg].msg_hdr.msg_control = NULL;
-    msgbuf[num_msg].msg_hdr.msg_controllen = 0;
-    msgbuf[num_msg].msg_hdr.msg_flags = 0;
-    num_msg++;
+    // this is a temperary hack: we don't want to buffer the first several control packets
+    if (num_msg < 100) {
+        num_msg++;
+        if(sendto(listen_socket[sock].udp.fd, (char *) &inpkt->seqno, inpkt->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
+            if(sockmsgsize(sockerrno)) {
+                if(n->maxmtu >= origlen)
+                    n->maxmtu = origlen - 1;
+                if(n->mtu >= origlen)
+                    n->mtu = origlen - 1;
+            } else
+                logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+        }
+    } else {
+        msgbuf[num_msg].msg_hdr.msg_name = (void *) &sa->sa;
+        msgbuf[num_msg].msg_hdr.msg_namelen = SALEN(sa->sa);
+        msgbuf[num_msg].msg_hdr.msg_iovlen = 1;
+        msgbuf[num_msg].msg_hdr.msg_iov = malloc(sizeof(struct iovec));
+        msgbuf[num_msg].msg_hdr.msg_iov->iov_base = strndup((char *) &inpkt->seqno, inpkt->len);
+        msgbuf[num_msg].msg_hdr.msg_iov->iov_len = inpkt->len;
+        msgbuf[num_msg].msg_hdr.msg_control = NULL;
+        msgbuf[num_msg].msg_hdr.msg_controllen = 0;
+        msgbuf[num_msg].msg_hdr.msg_flags = 0;
+        num_msg++;
 
-    if (num_msg == MSGBUF_SZ) {
-        // Send all of them!
-        logger(DEBUG_ALWAYS, LOG_INFO, "sending 100 udp messages!");
-        if (sendmmsg(listen_socket[sock].udp.fd, msgbuf, MSGBUF_SZ, 0) < 0 &&
-            !sockwouldblock(sockerrno)) {
-			logger(DEBUG_ALWAYS, LOG_WARNING,
-                   "Error with sendmmsg: %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+        if (num_msg % MSGBUF_SZ == 0) {
+            // Send all of them!
+            logger(DEBUG_ALWAYS, LOG_INFO, "sending 100 udp messages!");
+            if (sendmmsg(listen_socket[sock].udp.fd, msgbuf, MSGBUF_SZ, 0) < 0 &&
+                !sockwouldblock(sockerrno)) {
+                logger(DEBUG_ALWAYS, LOG_WARNING,
+                       "Error with sendmmsg: %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+            }
+            // Free packets 
+            for (int i = 0; i < MSGBUF_SZ; i++) {
+                free(msgbuf[i].msg_hdr.msg_iov);
+                free(msgbuf[i].msg_hdr.msg_iov->iov_base);
+            }
         }
-        // Free packets 
-        for (int i = 0; i < MSGBUF_SZ; i++) {
-            free(msgbuf[i].msg_hdr.msg_iov);
-            free(msgbuf[i].msg_hdr.msg_iov->iov_base);
-        }
-        // Reset the counter
-        num_msg = 0;
     }
 
 end:
