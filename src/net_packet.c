@@ -753,6 +753,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 
     if (num_msg == MSGBUF_SZ) {
         // Send all of them!
+        logger(DEBUG_ALWAYS, LOG_INFO, "sending 100 udp messages!");
         if (sendmmsg(listen_socket[sock].udp.fd, msgbuf, MSGBUF_SZ, 0) < 0 &&
             !sockwouldblock(sockerrno)) {
 			logger(DEBUG_ALWAYS, LOG_WARNING,
