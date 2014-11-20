@@ -914,10 +914,13 @@ void send_packet(node_t *n, vpn_packet_t *packet) {
 			   n->name, via->name, n->via->hostname);
 
 	if(packet->priority == -1 || ((myself->options | via->options) & OPTION_TCPONLY)) {
+		logger(DEBUG_ALWAYS, LOG_INFO, "sending a tcp packet");
 		if(!send_tcppacket(via->connection, packet))
 			terminate_connection(via->connection, true);
-	} else
+    } else {
+		logger(DEBUG_ALWAYS, LOG_INFO, "sending a udp packet");
 		send_udppacket(via, packet);
+    }
 }
 
 /* Broadcast a packet using the minimum spanning tree */
