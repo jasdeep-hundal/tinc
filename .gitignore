@@ -16,3 +16,10 @@ INSTALL
 stamp-h1
 /src/device.c
 /doc
+
+# vim files
+*~
+*.swp
+*.swo
+
+*.dirstamp
