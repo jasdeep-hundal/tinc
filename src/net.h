@@ -201,6 +201,8 @@ extern int reload_configuration(void);
 extern void load_all_subnets(void);
 extern void load_all_nodes(void);
 
+extern void flush_buffer_handler(void *);
+
 #ifndef HAVE_MINGW
 #define closesocket(s) close(s)
 #endif

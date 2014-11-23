@@ -46,6 +46,7 @@ static int sleeptime = 10;
 time_t last_config_check = 0;
 static timeout_t pingtimer;
 static timeout_t periodictimer;
+static timeout_t flush_buffer_timer;
 
 /* Purge edges and subnets of unreachable nodes. Use carefully. */
 
@@ -450,6 +451,7 @@ void retry(void) {
 int main_loop(void) {
 	timeout_add(&pingtimer, timeout_handler, &pingtimer, &(struct timeval){pingtimeout, rand() % 100000});
 	timeout_add(&periodictimer, periodic_handler, &periodictimer, &(struct timeval){pingtimeout, rand() % 100000});
+    timeout_add(&flush_buffer_timer, flush_buffer_handler, NULL, &(struct timeval){pingtimeout, rand() % 100000});
 
 #ifndef HAVE_MINGW
 	signal_t sighup = {0};
@@ -480,6 +482,7 @@ int main_loop(void) {
 
 	timeout_del(&periodictimer);
 	timeout_del(&pingtimer);
+    timeout_del(&flush_buffer_timer);
 
 	return 0;
 }

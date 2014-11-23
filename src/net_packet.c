@@ -59,9 +59,21 @@ bool localdiscovery = true;
 #define MAX_SEQNO 1073741824
 
 #define MSGBUF_SZ 100
-static struct mmsghdr msgbuf[MSGBUF_SZ];
-static unsigned int num_msg = 0;
-static bool in_control_phase = true;
+
+// A msg state stores the packets that are going toward a particular node
+typedef struct msg_state {
+    int sock;  // the connection
+    node_t *node;  // the node
+    int num_msg;  // the number of packets
+    struct mmsghdr msgbuf[MSGBUF_SZ];  // the buffer
+} *msg_state_t;
+
+static msg_state_t msg_states[MSGBUF_SZ];
+static unsigned int num_msg_states = 0;
+
+// Stores the total number of packets in all the buffers
+// When it goes up to MSGBUF_SZ, we flush all the buffers
+static unsigned int total_msg = 0;
 
 /* mtuprobes == 1..30: initial discovery, send bursts with 1 second interval
    mtuprobes ==    31: sleep pinginterval seconds
@@ -623,6 +635,37 @@ static void choose_local_address(const node_t *n, const sockaddr_t **sa, int *so
 	}
 }
 
+static void
+flush_msgbuf(void)
+{
+    for (int i = 0; i < num_msg_states; i++) {
+        msg_state_t ms = msg_states[i];
+        logger(DEBUG_ALWAYS, LOG_INFO, "sending %d udp messages to %s (%s)!",
+               ms->num_msg, ms->node->name, ms->node->hostname);
+        if (sendmmsg(listen_socket[ms->sock].udp.fd, ms->msgbuf, ms->num_msg, 0) < 0 &&
+            !sockwouldblock(sockerrno)) {
+            logger(DEBUG_ALWAYS, LOG_WARNING,
+                   "Error with sendmmsg: %s (%s): %s",
+                   ms->node->name, ms->node->hostname,
+                   sockstrerror(sockerrno));
+        }
+        // Free packets 
+        for (int i = 0; i < MSGBUF_SZ; i++) {
+            free(ms->msgbuf[i].msg_hdr.msg_iov->iov_base);
+            free(ms->msgbuf[i].msg_hdr.msg_iov);
+        }
+        // Reset the counter
+        total_msg = 0;
+    }
+
+    num_msg_states = 0;
+    total_msg = 0;
+}
+
+void flush_buffer_handler(void *_data) {
+    flush_msgbuf();
+}
+
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
 // the optimization will likely happen here
 static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
@@ -741,51 +784,33 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-    // this is a temperary hack: we don't want to buffer the first several control packets
-    if (in_control_phase) {
-        if(sendto(listen_socket[sock].udp.fd, (char *) &inpkt->seqno, inpkt->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
-            if(sockmsgsize(sockerrno)) {
-                if(n->maxmtu >= origlen)
-                    n->maxmtu = origlen - 1;
-                if(n->mtu >= origlen)
-                    n->mtu = origlen - 1;
-            } else
-                logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+    struct msghdr *hdr = NULL;
+    for (int i = 0; i < num_msg_states; i++) {
+        if (msg_states[i]->sock == sock) {
+            hdr = &msg_states[i]->msgbuf[msg_states[i]->num_msg++].msg_hdr;
         }
-        num_msg++;
-        if (num_msg > 100) {
-            in_control_phase = false;
-            num_msg = 0;
-        }
-    } else {
-        logger(DEBUG_ALWAYS, LOG_INFO, "here yo yo yo!");
-        msgbuf[num_msg].msg_hdr.msg_name = (void *) &sa->sa;
-        msgbuf[num_msg].msg_hdr.msg_namelen = SALEN(sa->sa);
-        msgbuf[num_msg].msg_hdr.msg_iovlen = 1;
-        msgbuf[num_msg].msg_hdr.msg_iov = malloc(sizeof(struct iovec));
-        msgbuf[num_msg].msg_hdr.msg_iov->iov_base = strndup((char *) &inpkt->seqno, inpkt->len);
-        msgbuf[num_msg].msg_hdr.msg_iov->iov_len = inpkt->len;
-        msgbuf[num_msg].msg_hdr.msg_control = NULL;
-        msgbuf[num_msg].msg_hdr.msg_controllen = 0;
-        msgbuf[num_msg].msg_hdr.msg_flags = 0;
-        num_msg++;
+    }
 
-        if (num_msg == MSGBUF_SZ) {
-            // Send all of them!
-            logger(DEBUG_ALWAYS, LOG_INFO, "sending 100 udp messages!");
-            if (sendmmsg(listen_socket[sock].udp.fd, msgbuf, MSGBUF_SZ, 0) < 0 &&
-                !sockwouldblock(sockerrno)) {
-                logger(DEBUG_ALWAYS, LOG_WARNING,
-                       "Error with sendmmsg: %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
-            }
-            // Free packets 
-            for (int i = 0; i < MSGBUF_SZ; i++) {
-                free(msgbuf[i].msg_hdr.msg_iov);
-                free(msgbuf[i].msg_hdr.msg_iov->iov_base);
-            }
-            // Reset the counter
-            num_msg = 0;
-        }
+    if (!hdr) {
+        msg_state_t ms = msg_states[num_msg_states++];
+        ms->num_msg = 1;
+        ms->sock = sock;
+        ms->node = n;
+        hdr = &ms->msgbuf[0].msg_hdr;
+    }
+
+    hdr->msg_name = (void *) &sa->sa;
+    hdr->msg_namelen = SALEN(sa->sa);
+    hdr->msg_iovlen = 1;
+    hdr->msg_iov = malloc(sizeof(struct iovec));
+    hdr->msg_iov->iov_base = strndup((char *) &inpkt->seqno, inpkt->len);
+    hdr->msg_iov->iov_len = inpkt->len;
+    hdr->msg_control = NULL;
+    hdr->msg_controllen = 0;
+    hdr->msg_flags = 0;
+
+    if (total_msg == MSGBUF_SZ) {
+        flush_msgbuf();
     }
 
 end:
