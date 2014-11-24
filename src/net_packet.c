@@ -638,6 +638,7 @@ static void choose_local_address(const node_t *n, const sockaddr_t **sa, int *so
 static void
 flush_msgbuf(void)
 {
+	logger(DEBUG_ALWAYS, LOG_DEBUG, "flushing msgbuf!");
     for (int i = 0; i < num_msg_states; i++) {
         msg_state_t ms = msg_states[i];
         logger(DEBUG_ALWAYS, LOG_INFO, "sending %d udp messages to %s (%s)!",
