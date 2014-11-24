@@ -663,8 +663,11 @@ flush_msgbuf(void)
     total_msg = 0;
 }
 
-void flush_buffer_handler(void *_data) {
+void flush_buffer_handler(void *data) {
+    timeout_t *timeout = (timeout_t *) data;
     flush_msgbuf();
+	logger(DEBUG_ALWAYS, LOG_DEBUG, "deleting timer!");
+    timeout_del(timeout);
 }
 
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of

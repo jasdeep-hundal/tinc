@@ -271,13 +271,13 @@ bool event_loop(void) {
 			fds = last->fd + 1;
 		}
 
-
-	    logger(DEBUG_ALWAYS, LOG_DEBUG, "adding timer!");
-        timeout_add(&flush_buffer_timer, flush_buffer_handler, NULL, &(struct timeval){pingtimeout, rand() % 100000 + 100});
+        if (!flush_buffer_timer.cb) {
+	        logger(DEBUG_ALWAYS, LOG_DEBUG, "adding timer!");
+            timeout_add(&flush_buffer_timer, flush_buffer_handler, &flush_buffer_timer,
+                        &(struct timeval){pingtimeout, rand() % 100000 + 100});
+        }
         // ANNOT: select is inefficient.  Why not epoll?
 		int n = select(fds, &readable, &writable, NULL, tv);
-	    logger(DEBUG_ALWAYS, LOG_DEBUG, "deleting timer!");
-        timeout_del(&flush_buffer_timer);
 
 		if(n < 0) {
 			if(sockwouldblock(sockerrno))
