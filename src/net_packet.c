@@ -46,6 +46,16 @@
 #include "utils.h"
 #include "xalloc.h"
 
+#include "pthread.h"
+
+typedef struct packet_thread_info_t {
+    listen_socket_t listen_socket;
+    node_t *n;
+    int thread_num;
+    int origlen;
+	const sockaddr_t *sa;
+} packet_thread_info_t;
+
 int keylifetime = 0;
 #ifdef HAVE_LZO
 static char lzo_wrkmem[LZO1X_999_MEM_COMPRESS > LZO1X_1_MEM_COMPRESS ? LZO1X_999_MEM_COMPRESS : LZO1X_1_MEM_COMPRESS];
@@ -618,6 +628,28 @@ static void choose_local_address(const node_t *n, const sockaddr_t **sa, int *so
 	}
 }
 
+static void send_buffered_packets(packet_thread_info_t *packet_thread_info) {
+    listen_socket_t listen_socket = packet_thread_info->listen_socket;
+    node_t *n = packet_thread_info->n;
+    int thread_num = packet_thread_info->thread_num;
+    int origlen = packet_thread_info->origlen;
+    const sockaddr_t *sa = packet_thread_info->sa;
+    int i;
+
+    for (i = 0; i < listen_socket.buffer_items / 4; i++) {
+        if(sendto(listen_socket.udp.fd, (char *) &(listen_socket.packet_buffer[i*4 + thread_num]->seqno), listen_socket.packet_buffer[i*4 + thread_num]->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
+            if(sockmsgsize(sockerrno)) {
+                if(n->maxmtu >= origlen)
+                    n->maxmtu = origlen - 1;
+                if(n->mtu >= origlen)
+                    n->mtu = origlen - 1;
+            } else
+                logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+        }
+        free(listen_socket.packet_buffer[i*4 + thread_num]);
+    }
+}
+
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
 // the optimization will likely happen here
 static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
@@ -720,6 +752,9 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 
 	const sockaddr_t *sa = NULL;
 	int sock;
+    int i;
+    pthread_t thread_ids[4];
+    packet_thread_info_t packet_thread_infos[4];
 
 	if(n->status.send_locally)
 		choose_local_address(n, &sa, &sock);
@@ -736,15 +771,24 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-	if(sendto(listen_socket[sock].udp.fd, (char *) &inpkt->seqno, inpkt->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
-		if(sockmsgsize(sockerrno)) {
-			if(n->maxmtu >= origlen)
-				n->maxmtu = origlen - 1;
-			if(n->mtu >= origlen)
-				n->mtu = origlen - 1;
-		} else
-			logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
-	}
+    listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items] = xmalloc(sizeof(vpn_packet_t));
+    memcpy(listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items], inpkt, sizeof(vpn_packet_t));
+    listen_socket[sock].buffer_items++;
+
+    if (listen_socket[sock].buffer_items == listen_socket[sock].buffer_size) {
+        for (i = 0; i < 4; i++) {
+            packet_thread_infos[i].listen_socket = listen_socket[sock];
+            packet_thread_infos[i].n = n;
+            packet_thread_infos[i].thread_num = i;
+            packet_thread_infos[i].origlen = origlen;
+            packet_thread_infos[i].sa = sa;
+            pthread_create(&(thread_ids[i]), NULL, (void *) &send_buffered_packets, &(packet_thread_infos[i]));
+        }
+        for (i = 0; i < 4; i++) {
+            pthread_join(thread_ids[i], NULL);
+        }
+        listen_socket[sock].buffer_items = 0;
+    }
 
 end:
 	origpkt->len = origlen;

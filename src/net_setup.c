@@ -975,6 +975,10 @@ static bool setup_myself(void) {
 			io_add(&listen_socket[i].tcp, (io_cb_t)handle_new_meta_connection, &listen_socket[i], i + 3, IO_READ);
 			io_add(&listen_socket[i].udp, (io_cb_t)handle_incoming_vpn_data, &listen_socket[i], udp_fd, IO_READ);
 
+            listen_socket[i].packet_buffer = xmalloc(sizeof(char*) * 16);
+            listen_socket[i].buffer_size = 1024;
+            listen_socket[i].buffer_items = 0;
+
 			if(debug_level >= DEBUG_CONNECTIONS) {
 				hostname = sockaddr2hostname(&sa);
 				logger(DEBUG_CONNECTIONS, LOG_NOTICE, "Listening on %s", hostname);
@@ -1104,6 +1108,8 @@ void close_network_connections(void) {
 		io_del(&listen_socket[i].udp);
 		close(listen_socket[i].tcp.fd);
 		close(listen_socket[i].udp.fd);
+
+        free(listen_socket[i].packet_buffer);
 	}
 
 	exit_requests();
