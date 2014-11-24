@@ -380,6 +380,7 @@ static void handle_meta_write(connection_t *c) {
 	if(c->outbuf.len <= c->outbuf.offset)
 		return;
 
+	logger(DEBUG_ALWAYS, LOG_ERR, "sending data over tcp");
 	ssize_t outlen = send(c->socket, c->outbuf.data + c->outbuf.offset, c->outbuf.len - c->outbuf.offset, 0);
 	if(outlen <= 0) {
 		if(!sockerrno || sockerrno == EPIPE) {
