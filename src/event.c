@@ -248,6 +248,8 @@ static struct timeval * get_time_remaining(struct timeval *diff) {
 	return tv;
 }
 
+static timeout_t flush_buffer_timer;
+
 bool event_loop(void) {
 	running = true;
 
@@ -268,6 +270,7 @@ bool event_loop(void) {
 			fds = last->fd + 1;
 		}
 
+        timeout_add(&flush_buffer_timer, flush_buffer_handler, NULL, &(struct timeval){pingtimeout, rand() % 100000 + 100});
         // ANNOT: select is inefficient.  Why not epoll?
 		int n = select(fds, &readable, &writable, NULL, tv);
 
