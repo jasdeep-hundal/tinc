@@ -68,7 +68,7 @@ typedef struct msg_state {
     struct mmsghdr msgbuf[MSGBUF_SZ];  // the buffer
 } *msg_state_t;
 
-static msg_state_t msg_states[MSGBUF_SZ];
+static struct msg_state msg_states[MSGBUF_SZ];
 static unsigned int num_msg_states = 0;
 
 // Stores the total number of packets in all the buffers
@@ -640,7 +640,7 @@ flush_msgbuf(void)
 {
 	logger(DEBUG_ALWAYS, LOG_DEBUG, "flushing msgbuf!");
     for (int i = 0; i < num_msg_states; i++) {
-        msg_state_t ms = msg_states[i];
+        msg_state_t ms = &msg_states[i];
         logger(DEBUG_ALWAYS, LOG_INFO, "sending %d udp messages to %s (%s)!",
                ms->num_msg, ms->node->name, ms->node->hostname);
         if (sendmmsg(listen_socket[ms->sock].udp.fd, ms->msgbuf, ms->num_msg, 0) < 0 &&
@@ -787,13 +787,13 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 
     struct msghdr *hdr = NULL;
     for (int i = 0; i < num_msg_states; i++) {
-        if (msg_states[i]->sock == sock) {
-            hdr = &msg_states[i]->msgbuf[msg_states[i]->num_msg++].msg_hdr;
+        if (msg_states[i].sock == sock) {
+            hdr = &msg_states[i].msgbuf[msg_states[i].num_msg++].msg_hdr;
         }
     }
 
     if (!hdr) {
-        msg_state_t ms = msg_states[num_msg_states++];
+        msg_state_t ms = &msg_states[num_msg_states++];
         ms->num_msg = 1;
         ms->sock = sock;
         ms->node = n;
