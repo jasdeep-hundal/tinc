@@ -480,7 +480,6 @@ int main_loop(void) {
 
 	timeout_del(&periodictimer);
 	timeout_del(&pingtimer);
-    timeout_del(&flush_buffer_timer);
 
 	return 0;
 }

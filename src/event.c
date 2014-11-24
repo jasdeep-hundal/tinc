@@ -24,6 +24,7 @@
 #include "net.h"
 #include "utils.h"
 #include "xalloc.h"
+#include "logger.h"
 
 struct timeval now;
 
@@ -248,14 +249,14 @@ static struct timeval * get_time_remaining(struct timeval *diff) {
 	return tv;
 }
 
-static timeout_t flush_buffer_timer;
-
 bool event_loop(void) {
 	running = true;
 
 #ifndef HAVE_MINGW
 	fd_set readable;
 	fd_set writable;
+    timeout_t flush_buffer_timer;
+
 
 	while(running) {
 		struct timeval diff;
@@ -270,9 +271,13 @@ bool event_loop(void) {
 			fds = last->fd + 1;
 		}
 
+
+	    logger(DEBUG_ALWAYS, LOG_DEBUG, "adding timer!");
         timeout_add(&flush_buffer_timer, flush_buffer_handler, NULL, &(struct timeval){pingtimeout, rand() % 100000 + 100});
         // ANNOT: select is inefficient.  Why not epoll?
 		int n = select(fds, &readable, &writable, NULL, tv);
+	    logger(DEBUG_ALWAYS, LOG_DEBUG, "deleting timer!");
+        timeout_del(&flush_buffer_timer);
 
 		if(n < 0) {
 			if(sockwouldblock(sockerrno))
