@@ -651,7 +651,7 @@ flush_msgbuf(void)
                    sockstrerror(sockerrno));
         }
         // Free packets 
-        for (int i = 0; i < MSGBUF_SZ; i++) {
+        for (int i = 0; i < ms->num_msg; i++) {
             free(ms->msgbuf[i].msg_hdr.msg_iov->iov_base);
             free(ms->msgbuf[i].msg_hdr.msg_iov);
         }
