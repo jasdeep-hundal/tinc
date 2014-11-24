@@ -43,6 +43,8 @@
 #include "utils.h"
 #include "xalloc.h"
 
+#define BUFFER_SIZE 4
+
 char *myport;
 static io_t device_io;
 devops_t devops;
@@ -687,6 +689,10 @@ static bool add_listen_address(char *address, bool bindto) {
 			continue;
 		}
 
+        listen_socket[listen_sockets].packet_buffer = xmalloc(sizeof(char*) * BUFFER_SIZE);
+        listen_socket[listen_sockets].buffer_size = BUFFER_SIZE;
+        listen_socket[listen_sockets].buffer_items = 0;
+
 		io_add(&listen_socket[listen_sockets].tcp, handle_new_meta_connection, &listen_socket[listen_sockets], tcp_fd, IO_READ);
 		io_add(&listen_socket[listen_sockets].udp, handle_incoming_vpn_data, &listen_socket[listen_sockets], udp_fd, IO_READ);
 
@@ -975,6 +981,10 @@ static bool setup_myself(void) {
 			io_add(&listen_socket[i].tcp, (io_cb_t)handle_new_meta_connection, &listen_socket[i], i + 3, IO_READ);
 			io_add(&listen_socket[i].udp, (io_cb_t)handle_incoming_vpn_data, &listen_socket[i], udp_fd, IO_READ);
 
+            listen_socket[i].packet_buffer = xmalloc(sizeof(char*) * BUFFER_SIZE);
+            listen_socket[i].buffer_size = BUFFER_SIZE;
+            listen_socket[i].buffer_items = 0;
+
 			if(debug_level >= DEBUG_CONNECTIONS) {
 				hostname = sockaddr2hostname(&sa);
 				logger(DEBUG_CONNECTIONS, LOG_NOTICE, "Listening on %s", hostname);
@@ -1104,6 +1114,8 @@ void close_network_connections(void) {
 		io_del(&listen_socket[i].udp);
 		close(listen_socket[i].tcp.fd);
 		close(listen_socket[i].udp.fd);
+
+        free(listen_socket[i].packet_buffer);
 	}
 
 	exit_requests();

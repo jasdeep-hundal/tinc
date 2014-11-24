@@ -105,6 +105,9 @@ typedef struct listen_socket_t {
 	io_t udp;
 	sockaddr_t sa;
 	bool bindto;
+    vpn_packet_t **packet_buffer;
+    int buffer_size;
+    int buffer_items;
 } listen_socket_t;
 
 #include "conf.h"

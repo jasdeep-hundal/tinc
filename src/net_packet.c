@@ -46,6 +46,22 @@
 #include "utils.h"
 #include "xalloc.h"
 
+#include <sys/socket.h>
+#include <sys/uio.h>
+
+typedef struct packet_thread_info_t {
+    listen_socket_t listen_socket;
+    node_t *n;
+    int origlen;
+	const sockaddr_t *sa;
+} packet_thread_info_t;
+
+//struct iovec
+//{
+//    void *iov_base;   /* Pointer to data.  */
+//    size_t iov_len;   /* Length of data.  */
+//};
+
 int keylifetime = 0;
 #ifdef HAVE_LZO
 static char lzo_wrkmem[LZO1X_999_MEM_COMPRESS > LZO1X_1_MEM_COMPRESS ? LZO1X_999_MEM_COMPRESS : LZO1X_1_MEM_COMPRESS];
@@ -618,9 +634,50 @@ static void choose_local_address(const node_t *n, const sockaddr_t **sa, int *so
 	}
 }
 
+static void send_buffered_packets(packet_thread_info_t *packet_thread_info) {
+    listen_socket_t listen_socket = packet_thread_info->listen_socket;
+    node_t *n = packet_thread_info->n;
+    int origlen = packet_thread_info->origlen;
+    const sockaddr_t *sa = packet_thread_info->sa;
+    int i;
+
+    struct mmsghdr *msghdrs = xmalloc(sizeof(struct mmsghdr) * listen_socket.buffer_items);
+    struct iovec *iovecs = xmalloc(sizeof(struct iovec) * listen_socket.buffer_items);
+
+    for (i = 0; i < listen_socket.buffer_items; i++) {
+        iovecs[i].iov_base = (char *) &(listen_socket.packet_buffer[i]->seqno);
+        iovecs[i].iov_len = listen_socket.packet_buffer[i]->len;
+
+        msghdrs[i].msg_hdr.msg_name = &sa->sa;
+        msghdrs[i].msg_hdr.msg_namelen = SALEN(sa->sa);
+        msghdrs[i].msg_hdr.msg_iov = iovecs + i;
+        msghdrs[i].msg_hdr.msg_iovlen = 1;
+        msghdrs[i].msg_hdr.msg_control = NULL;
+        msghdrs[i].msg_hdr.msg_controllen = 0;
+        msghdrs[i].msg_hdr.msg_flags= 0;
+    }
+
+    if(sendmmsg(listen_socket.udp.fd, msghdrs, listen_socket.buffer_items, 0) < 0 && !sockwouldblock(sockerrno)) {
+        if(sockmsgsize(sockerrno)) {
+            if(n->maxmtu >= origlen)
+                n->maxmtu = origlen - 1;
+            if(n->mtu >= origlen)
+                n->mtu = origlen - 1;
+        } else
+            logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+    }
+
+    for (i = 0; i < listen_socket.buffer_items; i++) {
+        free(listen_socket.packet_buffer[i]);
+    }
+    free(msghdrs);
+    free(iovecs);
+}
+
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
 // the optimization will likely happen here
 static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
+    logger(DEBUG_ALWAYS, LOG_ERR, "Sending udp packet");
 	vpn_packet_t pkt1, pkt2;
 	vpn_packet_t *pkt[] = { &pkt1, &pkt2, &pkt1, &pkt2 };
 	vpn_packet_t *inpkt = origpkt;
@@ -720,6 +777,8 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 
 	const sockaddr_t *sa = NULL;
 	int sock;
+    int i;
+    packet_thread_info_t packet_thread_info;
 
 	if(n->status.send_locally)
 		choose_local_address(n, &sa, &sock);
@@ -736,15 +795,19 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-	if(sendto(listen_socket[sock].udp.fd, (char *) &inpkt->seqno, inpkt->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
-		if(sockmsgsize(sockerrno)) {
-			if(n->maxmtu >= origlen)
-				n->maxmtu = origlen - 1;
-			if(n->mtu >= origlen)
-				n->mtu = origlen - 1;
-		} else
-			logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
-	}
+    logger(DEBUG_ALWAYS, LOG_ERR, "Items in buffer: %d", listen_socket[sock].buffer_items);
+    listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items] = xmalloc(sizeof(vpn_packet_t));
+    memcpy(listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items], inpkt, sizeof(vpn_packet_t));
+    listen_socket[sock].buffer_items++;
+
+    if (listen_socket[sock].buffer_items == listen_socket[sock].buffer_size) {
+        packet_thread_info.listen_socket = listen_socket[sock];
+        packet_thread_info.n = n;
+        packet_thread_info.origlen = origlen;
+        packet_thread_info.sa = sa;
+        send_buffered_packets(&packet_thread_info);
+        listen_socket[sock].buffer_items = 0;
+    }
 
 end:
 	origpkt->len = origlen;
