@@ -816,6 +816,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	logger(DEBUG_ALWAYS, LOG_DEBUG, "msg_iovlen %lu; iov_len %lu",
            hdr->msg_iovlen, hdr->msg_iov->iov_len);
 
+    total_msg++;
     if (total_msg == MSGBUF_SZ) {
         flush_msgbuf();
     }
@@ -953,6 +954,7 @@ bool receive_sptps_record(void *handle, uint8_t type, const char *data, uint16_t
   send a packet to the given vpn ip.
 */
 void send_packet(node_t *n, vpn_packet_t *packet) {
+    logger(DEBUG_ALWAYS, LOG_DEBUG, "send_packet!");
 	node_t *via;
 
 	if(n == myself) {
@@ -977,6 +979,7 @@ void send_packet(node_t *n, vpn_packet_t *packet) {
 	n->out_bytes += packet->len;
 
 	if(n->status.sptps) {
+        logger(DEBUG_ALWAYS, LOG_DEBUG, "send_sptps_packet!");
 		send_sptps_packet(n, packet);
 		return;
 	}
@@ -988,9 +991,11 @@ void send_packet(node_t *n, vpn_packet_t *packet) {
 			   n->name, via->name, n->via->hostname);
 
 	if(packet->priority == -1 || ((myself->options | via->options) & OPTION_TCPONLY)) {
+        logger(DEBUG_ALWAYS, LOG_DEBUG, "send_tcppacket!");
 		if(!send_tcppacket(via->connection, packet))
 			terminate_connection(via->connection, true);
     } else {
+        logger(DEBUG_ALWAYS, LOG_DEBUG, "send_udppacket!");
 		send_udppacket(via, packet);
     }
 }
