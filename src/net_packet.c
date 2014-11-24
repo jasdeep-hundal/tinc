@@ -810,6 +810,9 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
     hdr->msg_controllen = 0;
     hdr->msg_flags = 0;
 
+	logger(DEBUG_ALWAYS, LOG_DEBUG, "msg_iovlen %lu; iov_len %lu",
+           hdr->msg_iovlen, hdr->msg_iov->iov_len);
+
     if (total_msg == MSGBUF_SZ) {
         flush_msgbuf();
     }
