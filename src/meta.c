@@ -93,7 +93,9 @@ bool send_meta(connection_t *c, const char *buffer, int length) {
     if (!msgbuf) msgbuf = msgbuf_create();
     msgbuf_add(msgbuf, c->socket, NULL, c->outbuf.data + c->outbuf.offset, c->outbuf.len);
 
-	io_set(&c->io, IO_READ);
+    buffer_clear(&c->outbuf);
+
+	io_set(&c->io, IO_READ | IO_WRITE);
 
 	return true;
 }
