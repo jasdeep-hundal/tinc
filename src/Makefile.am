@@ -92,6 +92,7 @@ tincd_SOURCES = \
 	utils.c utils.h \
 	xalloc.h \
 	version.c version.h \
+	msgbuf.c msgbuf.h \
 	$(ed25519_SOURCES) \
 	$(chacha_poly1305_SOURCES)
 

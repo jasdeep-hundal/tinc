@@ -255,8 +255,6 @@ bool event_loop(void) {
 #ifndef HAVE_MINGW
 	fd_set readable;
 	fd_set writable;
-    timeout_t flush_buffer_timer;
-
 
 	while(running) {
 		struct timeval diff;
@@ -271,11 +269,6 @@ bool event_loop(void) {
 			fds = last->fd + 1;
 		}
 
-        if (!flush_buffer_timer.cb) {
-	        logger(DEBUG_ALWAYS, LOG_DEBUG, "adding timer!");
-            timeout_add(&flush_buffer_timer, flush_buffer_handler, &flush_buffer_timer,
-                        &(struct timeval){pingtimeout, rand() % 100000 + 100});
-        }
         // ANNOT: select is inefficient.  Why not epoll?
 		int n = select(fds, &readable, &writable, NULL, tv);
 

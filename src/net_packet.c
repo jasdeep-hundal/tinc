@@ -45,6 +45,7 @@
 #include "route.h"
 #include "utils.h"
 #include "xalloc.h"
+#include "msgbuf.h"
 
 int keylifetime = 0;
 #ifdef HAVE_LZO
@@ -56,24 +57,9 @@ static void send_udppacket(node_t *, vpn_packet_t *);
 unsigned replaywin = 16;
 bool localdiscovery = true;
 
+static msgbuf_t msgbuf = NULL;
+
 #define MAX_SEQNO 1073741824
-
-#define MSGBUF_SZ 100
-
-// A msg state stores the packets that are going toward a particular node
-typedef struct msg_state {
-    int sock;  // the connection
-    node_t *node;  // the node
-    int num_msg;  // the number of packets
-    struct mmsghdr msgbuf[MSGBUF_SZ];  // the buffer
-} *msg_state_t;
-
-static struct msg_state msg_states[MSGBUF_SZ];
-static unsigned int num_msg_states = 0;
-
-// Stores the total number of packets in all the buffers
-// When it goes up to MSGBUF_SZ, we flush all the buffers
-static unsigned int total_msg = 0;
 
 /* mtuprobes == 1..30: initial discovery, send bursts with 1 second interval
    mtuprobes ==    31: sleep pinginterval seconds
@@ -635,41 +621,6 @@ static void choose_local_address(const node_t *n, const sockaddr_t **sa, int *so
 	}
 }
 
-static void
-flush_msgbuf(void)
-{
-	logger(DEBUG_ALWAYS, LOG_DEBUG, "flushing msgbuf!");
-    for (int i = 0; i < num_msg_states; i++) {
-        msg_state_t ms = &msg_states[i];
-        logger(DEBUG_ALWAYS, LOG_INFO, "sending %d udp messages to %s (%s)!",
-               ms->num_msg, ms->node->name, ms->node->hostname);
-        if (sendmmsg(listen_socket[ms->sock].udp.fd, ms->msgbuf, ms->num_msg, 0) < 0 &&
-            !sockwouldblock(sockerrno)) {
-            logger(DEBUG_ALWAYS, LOG_WARNING,
-                   "Error with sendmmsg: %s (%s): %s",
-                   ms->node->name, ms->node->hostname,
-                   sockstrerror(sockerrno));
-        }
-        // Free packets 
-        for (int i = 0; i < ms->num_msg; i++) {
-            free(ms->msgbuf[i].msg_hdr.msg_iov->iov_base);
-            free(ms->msgbuf[i].msg_hdr.msg_iov);
-        }
-        // Reset the counter
-        total_msg = 0;
-    }
-
-    num_msg_states = 0;
-    total_msg = 0;
-}
-
-void flush_buffer_handler(void *data) {
-    timeout_t *timeout = (timeout_t *) data;
-    flush_msgbuf();
-	logger(DEBUG_ALWAYS, LOG_DEBUG, "deleting timer!");
-    timeout_del(timeout);
-}
-
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
 // the optimization will likely happen here
 static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
@@ -788,38 +739,8 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-    struct msghdr *hdr = NULL;
-    for (int i = 0; i < num_msg_states; i++) {
-        if (msg_states[i].sock == sock) {
-            hdr = &msg_states[i].msgbuf[msg_states[i].num_msg++].msg_hdr;
-        }
-    }
-
-    if (!hdr) {
-        msg_state_t ms = &msg_states[num_msg_states++];
-        ms->num_msg = 1;
-        ms->sock = sock;
-        ms->node = n;
-        hdr = &ms->msgbuf[0].msg_hdr;
-    }
-
-    hdr->msg_name = (void *) &sa->sa;
-    hdr->msg_namelen = SALEN(sa->sa);
-    hdr->msg_iovlen = 1;
-    hdr->msg_iov = malloc(sizeof(struct iovec));
-    hdr->msg_iov->iov_base = strndup((char *) &inpkt->seqno, inpkt->len);
-    hdr->msg_iov->iov_len = inpkt->len;
-    hdr->msg_control = NULL;
-    hdr->msg_controllen = 0;
-    hdr->msg_flags = 0;
-
-	logger(DEBUG_ALWAYS, LOG_DEBUG, "msg_iovlen %lu; iov_len %lu",
-           hdr->msg_iovlen, hdr->msg_iov->iov_len);
-
-    total_msg++;
-    if (total_msg == MSGBUF_SZ) {
-        flush_msgbuf();
-    }
+    if (!msgbuf) msgbuf = msgbuf_create();
+    msgbuf_add(msgbuf, n->sock, sa, (char*) inpkt->data, inpkt->len);
 
 end:
 	origpkt->len = origlen;

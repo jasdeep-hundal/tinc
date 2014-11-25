@@ -29,6 +29,7 @@
 #include "protocol.h"
 #include "utils.h"
 #include "xalloc.h"
+#include "msgbuf.h"
 
 bool send_meta_sptps(void *handle, uint8_t type, const char *buffer, size_t length) {
 	connection_t *c = handle;
@@ -43,6 +44,8 @@ bool send_meta_sptps(void *handle, uint8_t type, const char *buffer, size_t leng
 
 	return true;
 }
+
+static msgbuf_t msgbuf = NULL;
 
 bool send_meta(connection_t *c, const char *buffer, int length) {
 	if(!c) {
@@ -69,7 +72,10 @@ bool send_meta(connection_t *c, const char *buffer, int length) {
 		buffer_add(&c->outbuf, buffer, length);
 	}
 
-	io_set(&c->io, IO_READ | IO_WRITE);
+    if (!msgbuf) msgbuf = msgbuf_create();
+    msgbuf_add(msgbuf, c->socket, NULL, c->outbuf.data + c->outbuf.offset, c->outbuf.len);
+
+	io_set(&c->io, IO_READ);
 
 	return true;
 }
