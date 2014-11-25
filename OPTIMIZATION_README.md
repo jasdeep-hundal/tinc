@@ -125,3 +125,17 @@ Compare network performance w/ and w/o tinc:
 
     ./perfTest.sh
 
+PROFILING
+=========
+Install gperftools from https://code.google.com/p/gperftools/
+Link tincd with -lprofiler by adding it to LIBS in Makefile.
+Set the CPUPROFILE environment var by running this:
+    export CPUPROFILE="/tmp/prof.out PATH_TO_TINCD -n YOUR_NETWORK_NAME"
+Start tinc by running
+
+    sudo tincd --no-detach -Dn netname
+
+Run netperf -H 192.168.57.2
+Run pprof to analyze the CPU usage
+    $ pprof PATH_TO_TINCD /tmp/prof.out         # -pg-like text output
+    $ pprof --web PATH_TO_TINCD /tmp/prof.out   # really cool
