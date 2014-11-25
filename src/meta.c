@@ -57,10 +57,11 @@ tcp_flush_buffer_handler(void *_data)
 void
 setup_tcpflush_timer(void)
 {
+    if (!msgbuf) msgbuf = msgbuf_create();
     static timeout_t flush_buffer_timer;
     timeout_add(&flush_buffer_timer,
                 tcp_flush_buffer_handler, NULL,
-                &(struct timeval){pingtimeout, rand() % 100000 + 100});
+                &(struct timeval){0, 100000});
 }
 
 bool send_meta(connection_t *c, const char *buffer, int length) {
