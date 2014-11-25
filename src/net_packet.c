@@ -37,6 +37,7 @@
 #include "digest.h"
 #include "device.h"
 #include "ethernet.h"
+#include "event.h"
 #include "graph.h"
 #include "logger.h"
 #include "net.h"
@@ -58,6 +59,21 @@ unsigned replaywin = 16;
 bool localdiscovery = true;
 
 static msgbuf_t msgbuf = NULL;
+
+void
+udp_flush_buffer_handler(void *_data)
+{
+    msgbuf_flush(msgbuf);
+}
+
+void
+setup_udpflush_timer(void)
+{
+    timeout_t flush_buffer_timer;
+    timeout_add(&flush_buffer_timer,
+                udp_flush_buffer_handler, NULL,
+                &(struct timeval){pingtimeout, rand() % 100000 + 100});
+}
 
 #define MAX_SEQNO 1073741824
 

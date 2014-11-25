@@ -23,6 +23,7 @@
 
 #include "cipher.h"
 #include "connection.h"
+#include "event.h"
 #include "logger.h"
 #include "meta.h"
 #include "net.h"
@@ -46,6 +47,21 @@ bool send_meta_sptps(void *handle, uint8_t type, const char *buffer, size_t leng
 }
 
 static msgbuf_t msgbuf = NULL;
+
+void
+tcp_flush_buffer_handler(void *_data)
+{
+    msgbuf_flush(msgbuf);
+}
+
+void
+setup_tcpflush_timer(void)
+{
+    timeout_t flush_buffer_timer;
+    timeout_add(&flush_buffer_timer,
+                tcp_flush_buffer_handler, NULL,
+                &(struct timeval){pingtimeout, rand() % 100000 + 100});
+}
 
 bool send_meta(connection_t *c, const char *buffer, int length) {
 	if(!c) {

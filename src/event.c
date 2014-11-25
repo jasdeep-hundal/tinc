@@ -269,6 +269,9 @@ bool event_loop(void) {
 			fds = last->fd + 1;
 		}
 
+        setup_udpflush_timer();
+        setup_tcpflush_timer();
+
         // ANNOT: select is inefficient.  Why not epoll?
 		int n = select(fds, &readable, &writable, NULL, tv);
 
