@@ -69,7 +69,7 @@ udp_flush_buffer_handler(void *_data)
 void
 setup_udpflush_timer(void)
 {
-    timeout_t flush_buffer_timer;
+    static timeout_t flush_buffer_timer;
     timeout_add(&flush_buffer_timer,
                 udp_flush_buffer_handler, NULL,
                 &(struct timeval){pingtimeout, rand() % 100000 + 100});
