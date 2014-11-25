@@ -73,4 +73,9 @@ extern void signal_del(signal_t *sig);
 extern bool event_loop(void);
 extern void event_exit(void);
 
+// Probably not the best place to put these, but oh well
+// In the future, we should probably manage udp buffer and tcp buffer together
+extern void set_udpflush_timer(void);
+extern void set_tcpflush_timer(void);
+
 #endif

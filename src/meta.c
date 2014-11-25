@@ -23,12 +23,14 @@
 
 #include "cipher.h"
 #include "connection.h"
+#include "event.h"
 #include "logger.h"
 #include "meta.h"
 #include "net.h"
 #include "protocol.h"
 #include "utils.h"
 #include "xalloc.h"
+#include "msgbuf.h"
 
 bool send_meta_sptps(void *handle, uint8_t type, const char *buffer, size_t length) {
 	connection_t *c = handle;
@@ -42,6 +44,25 @@ bool send_meta_sptps(void *handle, uint8_t type, const char *buffer, size_t leng
 	io_set(&c->io, IO_READ | IO_WRITE);
 
 	return true;
+}
+
+static msgbuf_t msgbuf = NULL;
+
+void
+tcp_flush_buffer_handler(void *_data)
+{
+    msgbuf_flush(msgbuf);
+}
+
+void
+setup_tcpflush_timer(void)
+{
+    if (!msgbuf) msgbuf = msgbuf_create();
+    static timeout_t flush_buffer_timer;
+    timeout_del(&flush_buffer_timer);
+    timeout_add(&flush_buffer_timer,
+                tcp_flush_buffer_handler, NULL,
+                &(struct timeval){0, 100000});
 }
 
 bool send_meta(connection_t *c, const char *buffer, int length) {
@@ -68,6 +89,11 @@ bool send_meta(connection_t *c, const char *buffer, int length) {
 	} else {
 		buffer_add(&c->outbuf, buffer, length);
 	}
+
+    if (!msgbuf) msgbuf = msgbuf_create();
+    msgbuf_add(msgbuf, c->socket, NULL, c->outbuf.data + c->outbuf.offset, c->outbuf.len);
+
+    buffer_clear(&c->outbuf);
 
 	io_set(&c->io, IO_READ | IO_WRITE);
 

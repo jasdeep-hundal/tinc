@@ -24,6 +24,7 @@
 #include "net.h"
 #include "utils.h"
 #include "xalloc.h"
+#include "logger.h"
 
 struct timeval now;
 
@@ -267,6 +268,9 @@ bool event_loop(void) {
 			io_t *last = io_tree.tail->data;
 			fds = last->fd + 1;
 		}
+
+        setup_udpflush_timer();
+        setup_tcpflush_timer();
 
         // ANNOT: select is inefficient.  Why not epoll?
 		int n = select(fds, &readable, &writable, NULL, tv);

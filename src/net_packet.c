@@ -37,6 +37,7 @@
 #include "digest.h"
 #include "device.h"
 #include "ethernet.h"
+#include "event.h"
 #include "graph.h"
 #include "logger.h"
 #include "net.h"
@@ -45,6 +46,7 @@
 #include "route.h"
 #include "utils.h"
 #include "xalloc.h"
+#include "msgbuf.h"
 
 int keylifetime = 0;
 #ifdef HAVE_LZO
@@ -55,6 +57,25 @@ static void send_udppacket(node_t *, vpn_packet_t *);
 
 unsigned replaywin = 16;
 bool localdiscovery = true;
+
+static msgbuf_t msgbuf = NULL;
+
+void
+udp_flush_buffer_handler(void *_data)
+{
+    msgbuf_flush(msgbuf);
+}
+
+void
+setup_udpflush_timer(void)
+{
+    if (!msgbuf) msgbuf = msgbuf_create();
+    static timeout_t flush_buffer_timer;
+    timeout_del(&flush_buffer_timer);
+    timeout_add(&flush_buffer_timer,
+                udp_flush_buffer_handler, NULL,
+                &(struct timeval){0, 100000});
+}
 
 #define MAX_SEQNO 1073741824
 
@@ -618,6 +639,8 @@ static void choose_local_address(const node_t *n, const sockaddr_t **sa, int *so
 	}
 }
 
+// ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
+// the optimization will likely happen here
 static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	vpn_packet_t pkt1, pkt2;
 	vpn_packet_t *pkt[] = { &pkt1, &pkt2, &pkt1, &pkt2 };
@@ -734,15 +757,8 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-	if(sendto(listen_socket[sock].udp.fd, (char *) &inpkt->seqno, inpkt->len, 0, &sa->sa, SALEN(sa->sa)) < 0 && !sockwouldblock(sockerrno)) {
-		if(sockmsgsize(sockerrno)) {
-			if(n->maxmtu >= origlen)
-				n->maxmtu = origlen - 1;
-			if(n->mtu >= origlen)
-				n->mtu = origlen - 1;
-		} else
-			logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
-	}
+    if (!msgbuf) msgbuf = msgbuf_create();
+    msgbuf_add(msgbuf, n->sock, sa, (char*) inpkt->data, inpkt->len);
 
 end:
 	origpkt->len = origlen;
@@ -914,8 +930,9 @@ void send_packet(node_t *n, vpn_packet_t *packet) {
 	if(packet->priority == -1 || ((myself->options | via->options) & OPTION_TCPONLY)) {
 		if(!send_tcppacket(via->connection, packet))
 			terminate_connection(via->connection, true);
-	} else
+    } else {
 		send_udppacket(via, packet);
+    }
 }
 
 /* Broadcast a packet using the minimum spanning tree */
