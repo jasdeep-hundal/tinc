@@ -16,6 +16,10 @@ INSTALL
 stamp-h1
 /src/device.c
 /doc
+/scripts/*.dat
+/scripts/*.txt
+/scripts/*.svg
+/scripts/FlameGraph/*
 
 # vim files
 *~
