@@ -49,6 +49,8 @@ sudo perf record -a -g -o $SYSTEM_PERF_FILE &
 #sudo perf record  -g -o $NETPERF_PERF_FILE -- netperf -H $REMOTE_HOST_IP
 #sudo perf stat -a netperf -H $REMOTE_HOST_IP
 netperf -H $REMOTE_HOST_IP
+sudo pkill -2 perf
+sleep 25
 sudo pkill -3 perf
 sudo pkill -3 ifstat
 
@@ -61,6 +63,8 @@ sudo perf record -a -g -o $SYSTEM_PERF_W_TINC_FILE &
 #sudo perf record -g -o $NETPERF_TINC_PERF_FILE -- netperf -H $REMOTE_HOST_TINC_IP
 #sudo perf stat -a netperf -H $REMOTE_HOST_TINC_IP
 netperf -H $REMOTE_HOST_TINC_IP
+sudo pkill -2 perf
+sleep 25
 sudo pkill -3 perf
 sudo pkill -3 ifstat
 sudo pkill -3 strace
