@@ -124,7 +124,7 @@ TEST SCRIPTS
 Start tincd and then netserver on one VM and the run of the following scripts on
 the other VM.
 
-Compare network performance w/ and w/o tinc:
+Compare network performance w/ and w/o tinc and generate flame graphs:
 
     ./perfTest.sh
 
