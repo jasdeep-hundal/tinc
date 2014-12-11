@@ -22,6 +22,11 @@ EOD
 )
 }
 
+# Checkout code for generating flame graph
+if [ ! -d "FlameGraph" ]; then
+    git clone https://github.com/brendangregg/FlameGraph.git
+fi
+
 # Names for output files for this run
 TIMESTAMP=`date +%s`
 TINCD_PERF_FILE="tinc_perf-$TIMESTAMP.dat"
@@ -35,10 +40,10 @@ HOST_IFACE_LOG="$PWD/host_bandwidth-$TIMESTAMP.txt"
 TINC_IFACE_LOG="$PWD/tinc_bandwidth-$TIMESTAMP.txt"
 
 # Start tincd on this host and get its process id
-sudo tincd -n $NETWORK_NAME
+sudo tincd --debug=0 -n $NETWORK_NAME
 LOCAL_TINCD_PID=`pgrep tincd`
 # Start tincd on the remote host
-remote_host_command "sudo tincd -n $NETWORK_NAME" > /dev/null
+remote_host_command "sudo tincd --debug=0 -n $NETWORK_NAME" > /dev/null
 # Start netperf server on remote host
 remote_host_command "nohup netserver" > /dev/null
 
@@ -74,3 +79,9 @@ sudo pkill -3 tincd
 remote_host_command "sudo pkill -3 netserver" > /dev/null
 # Shut down tincd on remote host
 remote_host_command "sudo pkill -3 tincd" > /dev/null
+
+# Generate flame graphs
+FLAME_GRAPH="perf-$TIMESTAMP.svg"
+FLAME_GRAPH_TINC="perf-tinc-$TIMESTAMP.svg"
+sudo perf script -i $SYSTEM_PERF_FILE | sudo ./FlameGraph/stackcollapse-perf.pl | sudo ./FlameGraph/flamegraph.pl > $FLAME_GRAPH
+sudo perf script -i $SYSTEM_PERF_W_TINC_FILE | sudo ./FlameGraph/stackcollapse-perf.pl | sudo ./FlameGraph/flamegraph.pl > $FLAME_GRAPH_TINC
