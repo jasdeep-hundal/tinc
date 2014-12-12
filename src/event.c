@@ -17,6 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
+#include <sys/epoll.h>
 #include "system.h"
 
 #include "dropin.h"
@@ -28,8 +29,7 @@
 struct timeval now;
 
 #ifndef HAVE_MINGW
-static fd_set readfds;
-static fd_set writefds;
+static int epollset = 0;
 #else
 static const long READ_EVENTS = FD_READ | FD_ACCEPT | FD_CLOSE;
 static const long WRITE_EVENTS = FD_WRITE | FD_CONNECT;
@@ -97,6 +97,7 @@ void io_add_event(io_t *io, io_cb_t cb, void *data, WSAEVENT event) {
 #endif
 
 void io_set(io_t *io, int flags) {
+    if (!epollset) epollset = epoll_create1(0);
 	if (flags == io->flags)
 		return;
 	io->flags = flags;
@@ -104,15 +105,21 @@ void io_set(io_t *io, int flags) {
 		return;
 
 #ifndef HAVE_MINGW
-	if(flags & IO_READ)
-		FD_SET(io->fd, &readfds);
-	else
-		FD_CLR(io->fd, &readfds);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = io->fd;
 
-	if(flags & IO_WRITE)
-		FD_SET(io->fd, &writefds);
-	else
-		FD_CLR(io->fd, &writefds);
+    if (flags & IO_READ) {
+        epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev);
+    }
+
+    if (flags & IO_WRITE) {
+        epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev);
+    }
+    
+    if (!(flags & IO_READ) && !(flags & IO_WRITE)) {
+        epoll_ctl(epollset, EPOLL_CTL_DEL, io->fd, NULL);
+    }
 #else
 	long events = 0;
 	if (flags & IO_WRITE)
@@ -249,6 +256,7 @@ static struct timeval * get_time_remaining(struct timeval *diff) {
 }
 
 bool event_loop(void) {
+    if (!epollset) epollset = epoll_create1(0);
 	running = true;
 
 #ifndef HAVE_MINGW
@@ -258,17 +266,16 @@ bool event_loop(void) {
 	while(running) {
 		struct timeval diff;
 		struct timeval *tv = get_time_remaining(&diff);
-		memcpy(&readable, &readfds, sizeof readable);
-		memcpy(&writable, &writefds, sizeof writable);
 
-		int fds = 0;
+		int maxfds = 0;
 
 		if(io_tree.tail) {
 			io_t *last = io_tree.tail->data;
-			fds = last->fd + 1;
+			maxfds = last->fd + 1;
 		}
 
-		int n = select(fds, &readable, &writable, NULL, tv);
+        struct epoll_event events[maxfds];
+        int n = epoll_wait(epollset, events, maxfds, tv->tv_sec * 1000 + tv->tv_usec / 1000);
 
 		if(n < 0) {
 			if(sockwouldblock(sockerrno))
@@ -281,10 +288,17 @@ bool event_loop(void) {
 			continue;
 
 		for splay_each(io_t, io, &io_tree) {
-			if(FD_ISSET(io->fd, &writable))
-				io->cb(io->data, IO_WRITE);
-			else if(FD_ISSET(io->fd, &readable))
-				io->cb(io->data, IO_READ);
+            for (int i = 0; i < n; i++) {
+                if (events[i].data.fd == io->fd) {
+                    if (events[i].events & EPOLLIN) {
+				        io->cb(io->data, IO_READ);
+                    }
+
+                    if (events[i].events & EPOLLOUT) {
+				        io->cb(io->data, IO_WRITE);
+                    }
+                }
+            }
 		}
 	}
 #else
