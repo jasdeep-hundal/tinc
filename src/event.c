@@ -111,17 +111,14 @@ void io_set(io_t *io, int flags) {
 
     epoll_ctl(epollset, EPOLL_CTL_DEL, io->fd, NULL);
     if ((flags & IO_READ) && (flags & IO_WRITE)) {
-		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a read/write fd to epoll: %d", io->fd);
         ev.events = EPOLLIN | EPOLLOUT;
     }
 
     else if (flags & IO_READ) {
-		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a read fd to epoll: %d", io->fd);
         ev.events = EPOLLIN;
     }
 
     else if (flags & IO_WRITE) {
-		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a write fd to epoll: %d", io->fd);
         ev.events = EPOLLOUT;
     }
 
@@ -287,8 +284,6 @@ bool event_loop(void) {
         int timeout = tv->tv_sec * 1000 + tv->tv_usec / 1000;
         if (timeout == 0 && tv->tv_usec > 0) timeout = 1;
         int n = epoll_wait(epollset, events, maxfds, tv->tv_sec * 1000 + tv->tv_usec / 1000);
-		logger(DEBUG_ALWAYS, LOG_INFO, "maxfds: %d; n: %d; timeout: %d; sec: %d; usec: %d",
-               maxfds, n, timeout, tv->tv_sec, tv->tv_usec);
 
 		if(n < 0) {
 			if(sockwouldblock(sockerrno))
