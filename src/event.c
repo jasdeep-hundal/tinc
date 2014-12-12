@@ -109,19 +109,25 @@ void io_set(io_t *io, int flags) {
     struct epoll_event ev;
     ev.data.fd = io->fd;
 
-    if (flags & IO_READ) {
+    if ((flags & IO_READ) && (flags & IO_WRITE)) {
+		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a read/write fd to epoll: %d", io->fd);
+        ev.events = EPOLLIN | EPOLLOUT;
+        epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev);
+    }
+
+    else if (flags & IO_READ) {
 		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a read fd to epoll: %d", io->fd);
         ev.events = EPOLLIN;
         epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev);
     }
 
-    if (flags & IO_WRITE) {
+    else if (flags & IO_WRITE) {
 		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a write fd to epoll: %d", io->fd);
         ev.events = EPOLLOUT;
         epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev);
     }
     
-    if (!(flags & IO_READ) && !(flags & IO_WRITE)) {
+    else if (!(flags & IO_READ) && !(flags & IO_WRITE)) {
 		logger(DEBUG_ALWAYS, LOG_INFO, "Removing a fd from epoll: %d", io->fd);
         epoll_ctl(epollset, EPOLL_CTL_DEL, io->fd, NULL);
     }
@@ -265,9 +271,6 @@ bool event_loop(void) {
 	running = true;
 
 #ifndef HAVE_MINGW
-	fd_set readable;
-	fd_set writable;
-
 	while(running) {
 		struct timeval diff;
 		struct timeval *tv = get_time_remaining(&diff);
