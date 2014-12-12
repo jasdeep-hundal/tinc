@@ -281,6 +281,7 @@ bool event_loop(void) {
 
         struct epoll_event events[maxfds];
         int n = epoll_wait(epollset, events, maxfds, tv->tv_sec * 1000 + tv->tv_usec / 1000);
+		logger(DEBUG_ALWAYS, LOG_INFO, "maxfds: %d; n: %d", maxfds, n);
 
 		if(n < 0) {
 			if(sockwouldblock(sockerrno))
