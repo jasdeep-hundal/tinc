@@ -109,43 +109,28 @@ void io_set(io_t *io, int flags) {
     struct epoll_event ev;
     ev.data.fd = io->fd;
 
-    if (epoll_ctl(epollset, EPOLL_CTL_DEL, io->fd, NULL) < 0) {
-        perror("epoll_ctl_del");
-        return;
-    }
+    epoll_ctl(epollset, EPOLL_CTL_DEL, io->fd, NULL);
     if ((flags & IO_READ) && (flags & IO_WRITE)) {
 		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a read/write fd to epoll: %d", io->fd);
         ev.events = EPOLLIN | EPOLLOUT;
-        if (epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev) < 0) {
-            perror("epoll_ctl_add");
-            return;
-        }
     }
 
     else if (flags & IO_READ) {
 		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a read fd to epoll: %d", io->fd);
         ev.events = EPOLLIN;
-        if (epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev) < 0) {
-            perror("epoll_ctl_add");
-            return;
-        }
     }
 
     else if (flags & IO_WRITE) {
 		logger(DEBUG_ALWAYS, LOG_INFO, "Adding a write fd to epoll: %d", io->fd);
         ev.events = EPOLLOUT;
-        if (epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev) < 0) {
-            perror("epoll_ctl_add");
-            return;
-        }
     }
-    
-    else if (!(flags & IO_READ) && !(flags & IO_WRITE)) {
-		logger(DEBUG_ALWAYS, LOG_INFO, "Removing a fd from epoll: %d", io->fd);
-        if (epoll_ctl(epollset, EPOLL_CTL_DEL, io->fd, NULL) < 0) {
-            perror("epoll_ctl_del");
-            return;
-        }
+
+    else {
+        return;
+    }
+
+    if (epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev) < 0) {
+        perror("epoll_ctl_add");
     }
 #else
 	long events = 0;
@@ -299,8 +284,10 @@ bool event_loop(void) {
 		}
 
         struct epoll_event events[maxfds];
+        int timeout = tv->tv_sec * 1000 + tv->tv_usec / 1000;
         int n = epoll_wait(epollset, events, maxfds, tv->tv_sec * 1000 + tv->tv_usec / 1000);
-		logger(DEBUG_ALWAYS, LOG_INFO, "maxfds: %d; n: %d", maxfds, n);
+		logger(DEBUG_ALWAYS, LOG_INFO, "maxfds: %d; n: %d; timeout: %d; sec: %d; usec: %d",
+               maxfds, n, timeout, tv->tv_sec, tv->tv_usec);
 
 		if(n < 0) {
 			if(sockwouldblock(sockerrno))
