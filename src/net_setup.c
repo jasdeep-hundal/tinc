@@ -975,7 +975,7 @@ static bool setup_myself(void) {
 			io_add(&listen_socket[i].tcp, (io_cb_t)handle_new_meta_connection, &listen_socket[i], i + 3, IO_READ);
 			io_add(&listen_socket[i].udp, (io_cb_t)handle_incoming_vpn_data, &listen_socket[i], udp_fd, IO_READ);
 
-            listen_socket[i].packet_buffer = xmalloc(sizeof(char*) * 16);
+            listen_socket[i].packet_buffer = xmalloc(sizeof(char*) * 1024);
             listen_socket[i].buffer_size = 1024;
             listen_socket[i].buffer_items = 0;
 
