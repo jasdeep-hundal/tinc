@@ -285,6 +285,7 @@ bool event_loop(void) {
 
         struct epoll_event events[maxfds];
         int timeout = tv->tv_sec * 1000 + tv->tv_usec / 1000;
+        if (timeout == 0 && tv->tv_usec > 0) timeout = 1;
         int n = epoll_wait(epollset, events, maxfds, tv->tv_sec * 1000 + tv->tv_usec / 1000);
 		logger(DEBUG_ALWAYS, LOG_INFO, "maxfds: %d; n: %d; timeout: %d; sec: %d; usec: %d",
                maxfds, n, timeout, tv->tv_sec, tv->tv_usec);
