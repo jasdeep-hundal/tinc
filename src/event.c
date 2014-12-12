@@ -25,6 +25,7 @@
 #include "net.h"
 #include "utils.h"
 #include "xalloc.h"
+#include "logger.h"
 
 struct timeval now;
 
@@ -106,14 +107,15 @@ void io_set(io_t *io, int flags) {
 
 #ifndef HAVE_MINGW
     struct epoll_event ev;
-    ev.events = EPOLLIN;
     ev.data.fd = io->fd;
 
     if (flags & IO_READ) {
+        ev.events = EPOLLIN;
         epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev);
     }
 
     if (flags & IO_WRITE) {
+        ev.events = EPOLLOUT;
         epoll_ctl(epollset, EPOLL_CTL_ADD, io->fd, &ev);
     }
     
