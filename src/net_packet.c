@@ -46,6 +46,7 @@
 #include "utils.h"
 #include "xalloc.h"
 
+#include <sys/socket.h>
 #include <sys/uio.h>
 
 typedef struct packet_thread_info_t {
@@ -640,33 +641,37 @@ static void send_buffered_packets(packet_thread_info_t *packet_thread_info) {
     const sockaddr_t *sa = packet_thread_info->sa;
     int i;
 
-    struct msghdr msghdrs;
-    struct iovec iovecs;
+    struct mmsghdr *msghdrs = xmalloc(sizeof(struct mmsghdr) * listen_socket.buffer_items);
+    struct iovec *iovecs = xmalloc(sizeof(struct iovec) * listen_socket.buffer_items);
 
     for (i = 0; i < listen_socket.buffer_items; i++) {
+        iovecs[i].iov_base = (char *) &(listen_socket.packet_buffer[i]->seqno);
+        iovecs[i].iov_len = listen_socket.packet_buffer[i]->len;
 
-        iovecs.iov_base = (char *) &(listen_socket.packet_buffer[i]->seqno);
-        iovecs.iov_len = listen_socket.packet_buffer[i]->len;
+        msghdrs[i].msg_hdr.msg_name = &sa->sa;
+        msghdrs[i].msg_hdr.msg_namelen = SALEN(sa->sa);
+        msghdrs[i].msg_hdr.msg_iov = iovecs + i;
+        msghdrs[i].msg_hdr.msg_iovlen = 1;
+        msghdrs[i].msg_hdr.msg_control = NULL;
+        msghdrs[i].msg_hdr.msg_controllen = 0;
+        msghdrs[i].msg_hdr.msg_flags= 0;
+    }
 
-        msghdrs.msg_name = &sa->sa;
-        msghdrs.msg_namelen = SALEN(sa->sa);
-        msghdrs.msg_iov = &iovecs;
-        msghdrs.msg_iovlen = 1;
-        msghdrs.msg_control = NULL;
-        msghdrs.msg_controllen = 0;
-        msghdrs.msg_flags= 0;
+    if(sendmmsg(listen_socket.udp.fd, msghdrs, listen_socket.buffer_items, 0) < 0 && !sockwouldblock(sockerrno)) {
+        if(sockmsgsize(sockerrno)) {
+            if(n->maxmtu >= origlen)
+                n->maxmtu = origlen - 1;
+            if(n->mtu >= origlen)
+                n->mtu = origlen - 1;
+        } else
+            logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
+    }
 
-        if(sendmsg(listen_socket.udp.fd, &msghdrs, 0) < 0 && !sockwouldblock(sockerrno)) {
-            if(sockmsgsize(sockerrno)) {
-                if(n->maxmtu >= origlen)
-                    n->maxmtu = origlen - 1;
-                if(n->mtu >= origlen)
-                    n->mtu = origlen - 1;
-            } else
-                logger(DEBUG_TRAFFIC, LOG_WARNING, "Error sending packet to %s (%s): %s", n->name, n->hostname, sockstrerror(sockerrno));
-        }
+    for (i = 0; i < listen_socket.buffer_items; i++) {
         free(listen_socket.packet_buffer[i]);
     }
+    free(msghdrs);
+    free(iovecs);
 }
 
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
