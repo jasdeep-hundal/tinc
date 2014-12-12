@@ -155,7 +155,7 @@ Set the CPUPROFILE environment var by running
 
 Start tinc by running
 
-    sudo tincd --no-detach -Dn YOUR_NETWORK_NAME
+    sudo tincd -Dn YOUR_NETWORK_NAME
 
 Run netperf -H 192.168.57.2
 
