@@ -16,25 +16,12 @@ may vary. If you are running tinc on virtual machines, it is highly recommended
 that you enable paravirtualized networking if you have support for it.
 
 This configuration assumes that the VMs are connected via a host only network
-with adapters that are assigned the IP address 192.168.57.1 for VM1 and
-192.168.57.2 for VM2. In VirtualBox, this can be setup in Preferences -> Network
+with adapters that are assigned the IP address 192.168.57.1 for tinc in VM1 and
+192.168.57.2 for tinc in VM2. In VirtualBox, this can be setup in Preferences -> Network
 by adding a network with a host only adapter with IPv4 address 192.168.56.1 and
 a network mask of 255.255.255.0. Then the DHCP Server for the network can be
 configured with the server address 192.168.56.100, the server mask 255.255.255.0,
 and address bounds between 192.168.56.101 and 192.168.56.254.
-
-If you're using ubuntu, you can set static IP addresses by running
-
-    sudo vi /etc/network/interfaces
-
-append the following to the file:
-
-    auto eth0
-    iface eth0 inet static
-    address 192.168.57.1 (or 2 for VM2)
-    netmask 255.255.255.0
-    broadcast 192.168.57.255
-    gateway 192.168.57.3
 
 Refer to the tinc VPN installation/configuration docs for more information on
 these values.
