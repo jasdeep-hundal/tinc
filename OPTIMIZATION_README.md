@@ -122,9 +122,10 @@ The users used for tinc testing on both hosts must have passwordless sudo access
 TEST SCRIPTS
 ============
 Start tincd and then netserver on one VM and the run of the following scripts on
-the other VM.
+the other VM. This should be performed from the scripts directory.
 
-Compare network performance w/ and w/o tinc and generate flame graphs:
+Compare network performance w/ and w/o tinc and generate flame graphs.
+(The flame graphs will output as svg files in the scripts directory):
 
     ./perfTest.sh
 
