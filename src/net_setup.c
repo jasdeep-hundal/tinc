@@ -687,6 +687,10 @@ static bool add_listen_address(char *address, bool bindto) {
 			continue;
 		}
 
+        listen_socket[listen_sockets].packet_buffer = xmalloc(sizeof(char*) * 1024);
+        listen_socket[listen_sockets].buffer_size = 1024;
+        listen_socket[listen_sockets].buffer_items = 0;
+
 		io_add(&listen_socket[listen_sockets].tcp, handle_new_meta_connection, &listen_socket[listen_sockets], tcp_fd, IO_READ);
 		io_add(&listen_socket[listen_sockets].udp, handle_incoming_vpn_data, &listen_socket[listen_sockets], udp_fd, IO_READ);
 
