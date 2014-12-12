@@ -30,7 +30,7 @@ these values.
 The first step for the configuration is to set up each host with each of the
 listed configuration files EXCEPT for the hosts files that refer to different
 hosts. Then generate the public/private keypair for the host using:
-    sudo tincd -K YOUR_NETWORK_NAME
+    sudo tincd -K -n YOUR_NETWORK_NAME
 The private key should be saved in the file rsa_key.priv in
 /etc/tinc/YOUR_NETWORK_NAME/ and the public key should be appended to the
 appropriate host file in /etc/tinc/YOUR_NETWORK_NAME/hosts/
@@ -129,3 +129,41 @@ Compare network performance w/ and w/o tinc and generate flame graphs.
 
     ./perfTest.sh
 
+PROFILING
+=========
+Install gperftools from https://code.google.com/p/gperftools/
+
+Link tincd with -lprofiler by adding it to LIBS in src/Makefile.
+
+Mark beginning and end of the profiling by calling ProfilerStart(OUTPUT_PATH) and ProfilerStop() in source code. For profiling tinc, we inserted the folloing in src/tincd.c
+
+    ...
+    #include <gperftools/profiler.h>
+    ...
+    ProfilerStart("/tmp/prof.out");
+    try_outgoing_connections();
+    status = main_loop();
+    ...
+    close_network_connections();
+    ProfilerStop();
+
+Replace identname = xstrdup("tinc"); to identname = xstrdup("tinc.YOUR_NETWORK_NAME"); in src/names.c
+
+Set the CPUPROFILE environment var by running
+
+    export CPUPROFILE="/tmp/prof.out PATH_TO_TINCD -n YOUR_NETWORK_NAME"
+
+Start tinc by running
+
+    sudo tincd --no-detach -Dn YOUR_NETWORK_NAME
+
+Run netperf -H 192.168.57.2
+
+Stop tinc by running
+    
+    tinc stop
+    
+Run pprof to analyze the CPU usage
+
+    $ pprof PATH_TO_TINCD /tmp/prof.out         # -pg-like text output
+    $ pprof --web PATH_TO_TINCD /tmp/prof.out   # really cool
