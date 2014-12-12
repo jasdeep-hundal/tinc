@@ -50,7 +50,7 @@ void make_names(void) {
 	if(netname)
 		xasprintf(&identname, "tinc.%s", netname);
 	else
-		identname = xstrdup("tinc");
+		identname = xstrdup("tinc.netname");
 
 #ifdef HAVE_MINGW
 	if(!RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\tinc", 0, KEY_READ, &key)) {

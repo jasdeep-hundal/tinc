@@ -59,6 +59,7 @@
 #include "utils.h"
 #include "xalloc.h"
 #include "version.h"
+#include <gperftools/profiler.h>
 
 /* If nonzero, display usage information and exit. */
 static bool show_help = false;
@@ -455,6 +456,8 @@ int main2(int argc, char **argv) {
 
 	logger(DEBUG_ALWAYS, LOG_NOTICE, "Ready");
 
+	ProfilerStart("/tmp/prof.out");
+
 	try_outgoing_connections();
 
 	status = main_loop();
@@ -463,6 +466,8 @@ int main2(int argc, char **argv) {
 
 end:
 	close_network_connections();
+
+	ProfilerStop();
 
 	logger(DEBUG_ALWAYS, LOG_NOTICE, "Terminating");
 

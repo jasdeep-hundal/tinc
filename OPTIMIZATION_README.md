@@ -23,6 +23,18 @@ a network mask of 255.255.255.0. Then the DHCP Server for the network can be
 configured with the server address 192.168.56.100, the server mask 255.255.255.0,
 and address bounds between 192.168.56.101 and 192.168.56.254.
 
+If you're using ubuntu, you can set static IP addresses by running
+
+    sudo vi /etc/network/interfaces
+
+append the following to the file:
+
+    auto eth0
+    iface eth0 inet static
+    address 192.168.57.1 (or 2 for VM2)
+    netmask 255.255.255.0
+    broadcast 192.168.57.255
+    gateway 192.168.57.3
 
 Refer to the tinc VPN installation/configuration docs for more information on
 these values.
@@ -30,7 +42,7 @@ these values.
 The first step for the configuration is to set up each host with each of the
 listed configuration files EXCEPT for the hosts files that refer to different
 hosts. Then generate the public/private keypair for the host using:
-    sudo tincd -K YOUR_NETWORK_NAME
+    sudo tincd -K -n YOUR_NETWORK_NAME
 The private key should be saved in the file rsa_key.priv in
 /etc/tinc/YOUR_NETWORK_NAME/ and the public key should be appended to the
 appropriate host file in /etc/tinc/YOUR_NETWORK_NAME/hosts/
@@ -132,7 +144,7 @@ PROFILING
 =========
 Install gperftools from https://code.google.com/p/gperftools/
 
-Link tincd with -lprofiler by adding it to LIBS in Makefile.
+Link tincd with -lprofiler by adding it to LIBS in src/Makefile.
 
 Set the CPUPROFILE environment var by running
 
@@ -140,9 +152,15 @@ Set the CPUPROFILE environment var by running
 
 Start tinc by running
 
-    sudo tincd --no-detach -Dn YOUR_NETWORK_NAME
+    sudo tincd -Dn YOUR_NETWORK_NAME
 
-Run netperf -H 192.168.57.2
+In a separate terminal, run
+
+    netperf -H 192.168.57.2
+
+Stop tinc by running
+
+    sudo tinc stop
 
 Run pprof to analyze the CPU usage
 
