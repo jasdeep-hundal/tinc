@@ -677,7 +677,7 @@ static void send_buffered_packets(packet_thread_info_t *packet_thread_info) {
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
 // the optimization will likely happen here
 static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
-    logger(DEBUG_ALWAYS, LOG_ERR, "Sending udp packet");
+    logger(DEBUG_PROTOCOL, LOG_ERR, "Sending udp packet");
 	vpn_packet_t pkt1, pkt2;
 	vpn_packet_t *pkt[] = { &pkt1, &pkt2, &pkt1, &pkt2 };
 	vpn_packet_t *inpkt = origpkt;
@@ -795,7 +795,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-    logger(DEBUG_ALWAYS, LOG_ERR, "Items in buffer: %d", listen_socket[sock].buffer_items);
+    logger(DEBUG_PROTOCOL, LOG_ERR, "Items in buffer: %d", listen_socket[sock].buffer_items);
     listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items] = xmalloc(sizeof(vpn_packet_t));
     memcpy(listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items], inpkt, sizeof(vpn_packet_t));
     listen_socket[sock].buffer_items++;
