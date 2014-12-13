@@ -67,10 +67,12 @@ int keylifetime = 0;
 static char lzo_wrkmem[LZO1X_999_MEM_COMPRESS > LZO1X_1_MEM_COMPRESS ? LZO1X_999_MEM_COMPRESS : LZO1X_1_MEM_COMPRESS];
 #endif
 
-static void send_udppacket(node_t *, vpn_packet_t *);
+static void send_udppacket(node_t *, vpn_packet_t *, bool);
 
 unsigned replaywin = 16;
 bool localdiscovery = true;
+
+int packets_exchanged = 0;
 
 #define MAX_SEQNO 1073741824
 
@@ -163,7 +165,7 @@ static void send_mtu_probe_handler(void *data) {
 
 		logger(DEBUG_TRAFFIC, LOG_INFO, "Sending MTU probe length %d to %s (%s)", len, n->name, n->hostname);
 
-		send_udppacket(n, &packet);
+		send_udppacket(n, &packet, true);
 	}
 
 	n->status.send_locally = false;
@@ -217,7 +219,7 @@ static void mtu_probe_h(node_t *n, vpn_packet_t *packet, length_t len) {
 
 		bool udp_confirmed = n->status.udp_confirmed;
 		n->status.udp_confirmed = true;
-		send_udppacket(n, packet);
+		send_udppacket(n, packet, true);
 		n->status.udp_confirmed = udp_confirmed;
 	} else {
 		length_t probelen = len;
@@ -676,8 +678,8 @@ static void send_buffered_packets(packet_thread_info_t *packet_thread_info) {
 
 // ANNOT: this function does a lot of things: compression, encryption, producing digest... mose of
 // the optimization will likely happen here
-static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
-    logger(DEBUG_ALWAYS, LOG_ERR, "Sending udp packet");
+static void send_udppacket(node_t *n, vpn_packet_t *origpkt, bool immediate) {
+    //logger(DEBUG_ALWAYS, LOG_ERR, "Sending udp packet");
 	vpn_packet_t pkt1, pkt2;
 	vpn_packet_t *pkt[] = { &pkt1, &pkt2, &pkt1, &pkt2 };
 	vpn_packet_t *inpkt = origpkt;
@@ -721,7 +723,7 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 				n->name, n->hostname, n != n->nexthop ? n->nexthop->name : "TCP");
 
 		if(n != n->nexthop)
-			send_packet(n->nexthop, origpkt);
+			send_packet(n->nexthop, origpkt, immediate);
 		else
 			send_tcppacket(n->nexthop->connection, origpkt);
 
@@ -795,18 +797,18 @@ static void send_udppacket(node_t *n, vpn_packet_t *origpkt) {
 	}
 #endif
 
-    logger(DEBUG_ALWAYS, LOG_ERR, "Items in buffer: %d", listen_socket[sock].buffer_items);
     listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items] = xmalloc(sizeof(vpn_packet_t));
     memcpy(listen_socket[sock].packet_buffer[listen_socket[sock].buffer_items], inpkt, sizeof(vpn_packet_t));
     listen_socket[sock].buffer_items++;
 
-    if (listen_socket[sock].buffer_items == listen_socket[sock].buffer_size) {
+    if (listen_socket[sock].buffer_items == listen_socket[sock].buffer_size || packets_exchanged < 2000 || immediate == true) {
         packet_thread_info.listen_socket = listen_socket[sock];
         packet_thread_info.n = n;
         packet_thread_info.origlen = origlen;
         packet_thread_info.sa = sa;
         send_buffered_packets(&packet_thread_info);
         listen_socket[sock].buffer_items = 0;
+        packets_exchanged = packets_exchanged + 1;
     }
 
 end:
@@ -941,7 +943,7 @@ bool receive_sptps_record(void *handle, uint8_t type, const char *data, uint16_t
 /*
   send a packet to the given vpn ip.
 */
-void send_packet(node_t *n, vpn_packet_t *packet) {
+void send_packet(node_t *n, vpn_packet_t *packet, bool immediate) {
 	node_t *via;
 
 	if(n == myself) {
@@ -980,7 +982,7 @@ void send_packet(node_t *n, vpn_packet_t *packet) {
 		if(!send_tcppacket(via->connection, packet))
 			terminate_connection(via->connection, true);
 	} else
-		send_udppacket(via, packet);
+		send_udppacket(via, packet, immediate);
 }
 
 /* Broadcast a packet using the minimum spanning tree */
@@ -988,7 +990,7 @@ void send_packet(node_t *n, vpn_packet_t *packet) {
 void broadcast_packet(const node_t *from, vpn_packet_t *packet) {
 	// Always give ourself a copy of the packet.
 	if(from != myself)
-		send_packet(myself, packet);
+		send_packet(myself, packet, true);
 
 	// In TunnelServer mode, do not forward broadcast packets.
 	// The MST might not be valid and create loops.
@@ -1005,7 +1007,7 @@ void broadcast_packet(const node_t *from, vpn_packet_t *packet) {
 		case BMODE_MST:
 			for list_each(connection_t, c, connection_list)
 				if(c->edge && c->status.mst && c != from->nexthop->connection)
-					send_packet(c->node, packet);
+					send_packet(c->node, packet, true);
 			break;
 
 		// In direct mode, we send copies to each node we know of.
@@ -1017,7 +1019,7 @@ void broadcast_packet(const node_t *from, vpn_packet_t *packet) {
 
 			for splay_each(node_t, n, node_tree)
 				if(n->status.reachable && n != myself && ((n->via == myself && n->nexthop == n) || n->via == n))
-					send_packet(n, packet);
+					send_packet(n, packet, true);
 			break;
 
 		default:

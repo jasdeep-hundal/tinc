@@ -178,7 +178,7 @@ extern int setup_listen_socket(const sockaddr_t *);
 extern int setup_vpn_in_socket(const sockaddr_t *);
 extern bool send_sptps_data(void *handle, uint8_t type, const char *data, size_t len);
 extern bool receive_sptps_record(void *handle, uint8_t type, const char *data, uint16_t len);
-extern void send_packet(struct node_t *, vpn_packet_t *);
+extern void send_packet(struct node_t *, vpn_packet_t *, bool);
 extern void receive_tcppacket(struct connection_t *, const char *, int);
 extern void broadcast_packet(const struct node_t *, vpn_packet_t *);
 extern char *get_name(void);

@@ -43,7 +43,7 @@
 #include "utils.h"
 #include "xalloc.h"
 
-#define BUFFER_SIZE 4
+#define BUFFER_SIZE 16
 
 char *myport;
 static io_t device_io;
